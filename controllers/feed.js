@@ -1,16 +1,60 @@
-exports.getPosts = (req,res,next) => {
-    res.status(200).json({
-      posts: [{title: "Second Post", content: "This is the first post!"}]
-    });
-};
+const { validationResult } = require('express-validator/check')
+const Post = require('../models/post')
 
-exports.createPost = (req,res,next) => {
-      // create post in db
-      const title = req.body.title;
-      const content = req.body.content;
-      console.log(title, content);
-      res.status(201).json({
-        message: "Post created succesfuly",
-        post: {id: new Date().toISOString(), title:title, content:content}
-      });
+exports.getPosts = (req, res, next) => {
+  Post.find().then(posts => {
+    res.status(200).json({ message: 'Fetched posts succesfully', posts: posts })
+  }).catch(err => {
+    if (!err.statusCode) {
+      err.statusCode = 500
+    }
+    next(err)
+  })
+}
+
+exports.createPost = (req, res, next) => {
+  const errors = validationResult(req)
+  if (!errors.isEmpty()) {
+    const error = new Error('Validation failed, entered data is incorrect')
+    error.statusCode = 422
+    throw error
+  }
+  // create post in db
+  const title = req.body.title
+  const content = req.body.content
+  const post = new Post({
+    title: title,
+    content: content,
+    imageUrl: 'images/IMG_1513.JPG',
+    creator: { name: 'Samuel' },
+  })
+
+  post.save().then(result => {
+    res.status(201).json({
+      message: 'Post created succesfuly',
+      post: result
+    })
+  }).catch(err => {
+    if (!err.statusCode) {
+      err.statusCode = 500
+    }
+    next(err)
+  })
+}
+
+exports.getPost = (req, res, next) => {
+  const postId = req.params.postId
+  Post.findById(postId).then(post => {
+    if (!post) {
+      const err = new Error('Could not find post')
+      err.statusCode = 422
+      throw err
+    }
+    res.status(200).json({ message: 'Post fetched', post: post })
+  }).catch(err => {
+    if (!err.statusCode) {
+      err.statusCode = 500
+    }
+    next(err)
+  })
 }
