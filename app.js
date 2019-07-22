@@ -1,11 +1,32 @@
 const express = require('express')
 const mongoose = require('mongoose')
 const feedRoutes = require('./routes/feed')
+const uuidv4 = require('uuid/v4')
+const multer = require('multer')
 const path = require('path')
 require('dotenv').config()
 const app = express()
-app.use(express.json())
+
+
 app.use('/images', express.static(path.join(__dirname, 'images')))
+const fileStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, 'images')
+  },
+  filename: (req, file, cb) => {
+    cb(null, uuidv4() + '-' + file.originalname)
+  }
+})
+const fileFilter = (req, file, cb) => {
+  if (file.mimetype === 'image/png' || file.mimetype === 'image/jpg' || file.mimetype === 'image/jpeg') {
+    cb(null, true)
+  } else {
+    cb(null, false)
+  }
+}
+app.use(express.json())
+app.use(multer({storage: fileStorage, fileFilter: fileFilter }).single('image'))
+
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE')
@@ -22,8 +43,7 @@ app.use((error, req, res, next) => {
 })
 
 mongoose.connect(
-  process.env.DATABASE_URI
-).then(result => {
+  process.env.DATABASE_URI, { useNewUrlParser: true }).then(result => {
   app.listen(8080, () => {
     console.log('api server running')
   })
