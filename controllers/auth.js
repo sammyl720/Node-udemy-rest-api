@@ -10,7 +10,7 @@ exports.signup = (req, res, next) => {
     throw error
   }
   const { email, name, password } =  req.body
-  bcrypt.hash(password,12).then(hashedPassword => {
+  bcrypt.hash(password, 12).then(hashedPassword => {
     const user = new User({
       email,
       name,
