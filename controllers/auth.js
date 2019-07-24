@@ -3,13 +3,21 @@ const jwt = require('jsonwebtoken')
 const { validationResult } = require('express-validator')
 const bcrypt = require('bcryptjs')
 exports.signup = async (req, res, next) => {
-  const errors = validationResult(req)
-  if (!errors.isEmpty()) {
-    const error = new Error('Validation failed')
-    error.statusCode = 422
-    error.data = errors.array()
-    throw error
+  try{
+    const errors = await validationResult(req)
+    if (!errors.isEmpty()) {
+      const error = new Error('Validation failed')
+      error.statusCode = 422
+      error.data = errors.array()
+      throw error
+    }
+  } catch(err) {
+    if (!err.statusCode) {
+      err.statusCode = 500
+    }
+    next(err)
   }
+  
   const { email, name, password } = req.body
   try {
     const hashedPassword = await bcrypt.hash(password, 12)

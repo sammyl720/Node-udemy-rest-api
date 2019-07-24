@@ -1,4 +1,6 @@
 const { validationResult } = require('express-validator')
+
+const io = require('../socket')
 const Post = require('../models/post')
 const User = require('../models/user')
 const fs = require('fs')
@@ -8,8 +10,8 @@ exports.getPosts = async (req, res, next) => {
   const currentPage = req.query.page || 1
   const perPage = 2
   try {
-    const totalItems = await Post.find().populate('creator').countDocuments()
-    const posts = await Post.find().skip((currentPage - 1) * perPage).limit(perPage)
+    const totalItems = await Post.find().countDocuments()
+    const posts = await Post.find().skip((currentPage - 1) * perPage).populate('creator').sort({ createdAt: -1 }).limit(perPage)
     res.status(200).json({ message: 'Fetched posts succesfully', posts: posts, totalItems: totalItems })
   } catch (err) {
     if (!err.statusCode) {
@@ -48,7 +50,7 @@ exports.createPost = async (req, res, next) => {
     const user = await User.findById(req.userId)
     user.posts.push(post)
     await user.save()
-
+    io.getIO().emit('posts', { action: 'create', post: { ...post._doc, creator: { _id: req.userId, name: user.name } } })
     res.status(201).json({
       message: 'Post created succesfuly',
       post: postResult,
@@ -64,8 +66,8 @@ exports.createPost = async (req, res, next) => {
 
 exports.getPost = async (req, res, next) => {
   const postId = req.params.postId
-  const post = await Post.findById(postId)
   try {
+    const post = await Post.findById(postId).populate('creator')
     if (!post) {
       const err = new Error('Could not find post')
       err.statusCode = 422
@@ -90,6 +92,7 @@ exports.updatePost = async (req, res, next) => {
   }
   const { title, content } = req.body
   let imageUrl = req.body.image
+  console.log(imageUrl)
   if (req.file) {
     console.log(req.file.path)
     imageUrl = req.file.path.replace('\\', '/')
@@ -100,13 +103,13 @@ exports.updatePost = async (req, res, next) => {
     throw error
   }
   try {
-    const post = await Post.findById(postId)
+    const post = await Post.findById(postId).populate('creator')
     if (!post) {
       const err = new Error('Could not find post')
       err.statusCode = 422
       throw err
     }
-    if (post.creator.toString() !== req.userId) {
+    if (post.creator._id.toString() !== req.userId) {
       const err = new Error('Not authorized')
       err.statusCode = 403
       throw err
@@ -118,6 +121,7 @@ exports.updatePost = async (req, res, next) => {
     post.imageUrl = imageUrl
     post.content = content
     const result = await post.save()
+    io.getIO().emit('posts', { action: 'update', post: result })
     res.status(200).json({ message: 'Post updated!', post: result })
   } catch (err) {
     if (!err.statusCode) {
@@ -146,6 +150,7 @@ exports.deletePost = async (req, res, next ) => {
     const user = await User.findById(req.userId)
     user.posts.pull(postId)
     await user.save()
+    io.getIO().emit('posts', { action: 'delete', post: postId })
     res.status(200).json({ message: 'Deleted Post!' })
   } catch (err) {
     if (!err.statusCode) {

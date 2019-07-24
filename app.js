@@ -8,7 +8,6 @@ const path = require('path')
 require('dotenv').config()
 const app = express()
 
-
 app.use('/images', express.static(path.join(__dirname, 'images')))
 const fileStorage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -46,7 +45,11 @@ app.use((error, req, res, next) => {
 
 mongoose.connect(
   process.env.DATABASE_URI, { useNewUrlParser: true }).then(result => {
-  app.listen(8080, () => {
+  const server = app.listen(8080, () => {
     console.log('api server running')
   })
-}).catch(err => console.log(err));
+  const io = require('./socket').init(server)
+  io.on('connection', socket => {
+    console.log('client connected')
+  })
+}).catch(err => console.log(err))
